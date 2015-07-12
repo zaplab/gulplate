@@ -9,17 +9,18 @@ var gulpif = require('gulp-if');
 var concat = require('gulp-concat');
 var csslint = require('gulp-csslint');
 var cssmin = require('gulp-cssmin');
-var rename = require('gulp-rename');
 var imagemin = require('gulp-imagemin');
 var pngquant = require('imagemin-pngquant');
 var jshint = require('gulp-jshint');
 var uglify = require('gulp-uglify');
 var sass = require('gulp-sass');
+var sourcemaps = require('gulp-sourcemaps');
 var mochaPhantomJS = require('gulp-mocha-phantomjs');
 var browserSync = require('browser-sync');
 var browserSyncReload = browserSync.reload;
 var runSequence = require('run-sequence');
 var header = require('gulp-header');
+var eventStream = require('event-stream');
 
 var isDevMode = false,
     isServeTask = false,
@@ -49,12 +50,17 @@ switch (argv.target) {
 }
 
 // clear
+gulp.task('clean:end', function (cb) {
+    del([
+        'tmp'
+    ], cb);
+});
+
 gulp.task('clean', function (cb) {
     del([
         'dist/css',
         'dist/img',
-        'dist/js',
-        'tmp'
+        'dist/js'
     ], cb);
 });
 
@@ -97,14 +103,28 @@ gulp.task('mocha', function () {
     return stream;
 });
 
-gulp.task('mocha2', function () {
-    var stream = mochaPhantomJS();
-    stream.write({
-        path: 'http://localhost:8000/index.html'
-    });
-    stream.end();
-    return stream;
+gulp.task('setup-tests', function (cb) {
+    eventStream.concat(
+        // mocha
+        gulp.src([
+            'src/libs/bower/mocha/mocha.css',
+            'src/libs/bower/mocha/mocha.js'
+        ])
+            .pipe(gulp.dest('tests/libs')),
+        // chai
+        gulp.src([
+            'src/libs/bower/chai/chai.js'
+        ])
+            .pipe(gulp.dest('tests/libs')),
+        // ajax-test files
+        gulp.src('src/jekyll/ajax-test/**')
+            .pipe(gulp.dest('tests/ajax-test'))
+    ).on('end', cb);
 });
+
+gulp.task('setup', [
+    'setup-tests'
+]);
 
 gulp.task('test-css', function() {
     return gulp.src('src/css/main.scss')
@@ -125,11 +145,13 @@ gulp.task('test', [
 
 gulp.task('css', function() {
     return gulp.src('src/css/main.scss')
+        .pipe(gulpif(isDevMode, sourcemaps.init()))
         .pipe(sass({
             outputStyle: 'expanded'
         }))
         .pipe(csslint('tests/.csslintrc'))
         .pipe(csslint.reporter())
+        .pipe(gulpif(isDevMode, sourcemaps.write('./')))
         .pipe(gulpif(!isDevMode, header(banner, {
             pkg: pkg
         })))
@@ -143,7 +165,9 @@ gulp.task('js', ['test-js'], function() {
             'src/js/main.js',
             'src/js/module-a.js'
         ])
+        .pipe(gulpif(isDevMode, sourcemaps.init()))
         .pipe(concat('main.js'))
+        .pipe(gulpif(isDevMode, sourcemaps.write('./')))
         .pipe(gulpif(!isDevMode, header(banner, {
             pkg: pkg
         })))
@@ -179,8 +203,8 @@ gulp.task('watch', function () {
 });
 
 gulp.task('serve', [
-    'watch',
-    'default'
+    'default',
+    'watch'
 ], function () {
     isServeTask = true;
 
@@ -200,10 +224,12 @@ gulp.task('serve', [
 
 gulp.task('default', ['clean'], function (cb) {
     runSequence(
-    [
-        'css',
-        'js',
-        'images'
-    ],
-    cb);
+        [
+            'css',
+            'js',
+            'images'
+        ],
+        'clean:end',
+        cb
+    );
 });
