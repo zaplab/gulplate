@@ -2,6 +2,9 @@
   "name": "gulplate",
   "version": "0.0.0",
   "private": true,
-  "dependencies": {
+  "dependencies": {},
+  "devDependencies": {
+    "chai": "~1.10.0",
+    "mocha": "~2.1.0"
   }
 }

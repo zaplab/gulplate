@@ -4,4 +4,7 @@ dist/img/
 dist/js/
 node_modules/
 src/libs/bower/
-tests/dist/
+tests/dist/css/
+tests/dist/img/
+tests/dist/js/
+tests/libs/
